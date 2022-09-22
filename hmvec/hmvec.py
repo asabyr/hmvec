@@ -548,9 +548,12 @@ class HaloModel(Cosmology):
     def get_ngal(self,Nc,Ns): return ngal_from_mthresh(nzm=self.nzm,ms=self.ms,Ncs=Nc,Nss=Ns)
 
     def get_bg(self,Nc,Ns,ngal):
+        '''
+        integrand = self.nzm[..., None] * (Nc+Ns)[..., None] * self.bh
+        return np.trapz(integrand,self.ms,axis=-2)/ngal[...,None]
+        '''
         integrand = self.nzm[..., None] * (Nc+Ns) * self.bh
         return np.trapz(integrand,self.ms,axis=-2)/ngal
-
 
     def _get_hod_common(self,name):
         hod = self.hods[name]
