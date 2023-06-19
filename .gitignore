@@ -13,3 +13,10 @@ commented.py
 *.pyc
 hmvec/*.pyc
 hmvec/__pycache__/
+.ipynb_checkpoints/*
+**/*.ipynb_checkpoints*
+*__pycache__*
+**/*__pycache__*
+**.pyc
+*.pyc
+.DS_Store
