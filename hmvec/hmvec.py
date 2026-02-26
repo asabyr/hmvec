@@ -16,7 +16,7 @@ from .params import default_params, battaglia_defaults
 from .fft import generic_profile_fft
 import scipy
 
-from scipy.integrate import simps
+from scipy.integrate import simpson as simps
 from scipy.integrate import quad
 import time
 """
@@ -502,16 +502,16 @@ class HaloModel(Cosmology):
             self.cib_params['Td_o'] = 24.4
             self.cib_params['logM_eff'] = 12.6
             self.cib_params['var'] = 0.5
-            self.cib_params['L_o'] = 6.4e-8  # Changed by Anton to 4e-6 after fitting 2h to websky fig.7 at 143 Ghz #3.0e-15
-        elif name.lower() == 'viero':  # Vierro et al
-            self.cib_params['alpha'] = 0.2
+            self.cib_params['L_o'] = 8e-8 #9e-8 # Note: Modified by Anton on 7/23 to better match CIB PS
+        elif name.lower() == 'viero':  # Model 2 of Viero et al (arXiv:1208.5049)
+            self.cib_params['alpha'] = 0.2 # T_z in Viero et al
             self.cib_params['beta'] = 1.6
             self.cib_params['gamma'] = 1.7      # not in Viero, so using Planck13
-            self.cib_params['delta'] = 2.4
+            self.cib_params['delta'] = 2.4 # eta in Viero
             self.cib_params['Td_o'] = 20.7
-            self.cib_params['logM_eff'] = 12.3
+            self.cib_params['logM_eff'] = 12.3 # logM_peak in Viero
             self.cib_params['var'] = 0.3
-            self.cib_params['L_o'] = 6.4e-8 # Changed by Anton to 10 ** (-1.8) #3.0e-15
+            self.cib_params['L_o'] = 9e-8 # Note: Modified by Anton on 7/23 to better match CIB PS
         elif name==None and len(params)!=8:
             raise Exception("New sets of parameters require exactly 8 parameters")
         else:
@@ -556,8 +556,8 @@ class HaloModel(Cosmology):
         integrand = self.nzm[..., None] * (Nc+Ns)[..., None] * self.bh
         return np.trapz(integrand,self.ms,axis=-2)/ngal[...,None]
         '''
-        integrand = self.nzm[..., None] * (Nc+Ns) * self.bh
-        return np.trapz(integrand,self.ms,axis=-2)/ngal
+        integrand = self.nzm * (Nc+Ns) * self.bh_ofM
+        return np.trapz(integrand,self.ms,axis=-1)/ngal
 
     def _get_hod_common(self,name):
         hod = self.hods[name]
