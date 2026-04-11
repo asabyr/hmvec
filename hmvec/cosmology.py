@@ -595,7 +595,35 @@ class Cosmology(object):
         # 
 
         return limber_integral(ells,zs,ks,Ppp,zs,1,1,hzs,chis)
+    
+    def C_kSZ(self, ells, zs, ks, Pee, ne_0,sigmaT,dndz=None, zmin=None, zmax=None):
+        
+        chis = self.comoving_radial_distance(zs)
+        hzs = self.h_of_z(zs) # 1/Mpc
+        W_ksz=sigmaT*(1+zs)**2.0*ne_0/hzs #W(z)=W(chi)c/H(z) 
+        
+        return limber_integral(ells,zs,ks,Pee,zs,W_ksz,W_ksz,hzs,chis)
 
+    def C_DM(self, ells, zs, ks, Pee, ne_0,sigmaT,dndz=None, zmin=None, zmax=None):
+
+        chis = self.comoving_radial_distance(zs)
+        hzs = self.h_of_z(zs) # 1/Mpc
+        W_DM=sigmaT*(1+zs)*ne_0/hzs #W(z)=W(chi)c/H(z)     
+        
+        return limber_integral(ells,zs,ks,Pee,zs,W_DM,W_DM,hzs,chis)
+    
+    def C_kSZ_in_chi(self, ells, zs, ks, Pee, ne_0,sigmaT,dndz=None, zmin=None, zmax=None):
+        chis = self.comoving_radial_distance(zs)
+        W_ksz=sigmaT*(1+zs)**2.0*ne_0 #W(chi)
+
+        return limber_integral_in_chi(ells,zs,ks,Pee,zs,W_ksz,W_ksz,chis)
+    def C_DM(self, ells, zs, ks, Pee, ne_0,sigmaT,dndz=None, zmin=None, zmax=None):
+
+        chis = self.comoving_radial_distance(zs)
+        W_DM=sigmaT*(1+zs)*ne_0 #W(chi)
+
+        return limber_integral_in_chi(ells,zs,ks,Pee,zs,W_DM,W_DM,chis)
+    
     def total_matter_power_spectrum(self, Pnn, Pne, Pee):
         """
         Calculates the total matter auto-power spectrum.
@@ -902,4 +930,41 @@ def limber_integral(ells,zs,ks,Pzks,gzs,Wz1s,Wz2s,hzs,chis):
         if zevals.size==1: Cells[i] = interpolated * prefactor
         else: Cells[i] = np.trapz(interpolated*prefactor,zevals)
     return Cells
-    
+
+def limber_integral_in_chi(ells,zs,ks,Pzks,gzs,Wchi1s,Wchi2s,chis):
+    r"""
+    Get C(ell) = \int dchi W1(chi) W2(chi) Pzks(z,k=ell/chi) / chis**2.
+    ells: (nells,) multipoles looped over
+    zs: redshifts (npzs,) corresponding to Pzks
+    ks: comoving wavenumbers (nks,) corresponding to Pzks
+    Pzks: (npzs,nks) power specrum
+    gzs: (nzs,) corersponding to Wchi1s, Wchi2s, and chis
+    Wchi1s: weight function (nzs,)
+    Wchi2s: weight function (nzs,)
+    chis: comoving distances (nzs,)
+
+    We interpolate P(z,k)
+    """
+    hzs = np.array(hzs).reshape(-1)
+    Wchi1s = np.array(Wchi1s).reshape(-1)
+    Wchi2s = np.array(Wchi2s).reshape(-1)
+    chis = np.array(chis).reshape(-1)
+
+    prefactor = Wchi1s * Wchi2s   / chis**2.
+    zevals = gzs
+    if zs.size>1:
+         f = interp2d(ks,zs,Pzks,bounds_error=True)
+    else:
+         f = interp1d(ks,Pzks[0],bounds_error=True)
+    Cells = np.zeros(ells.shape)
+    for i,ell in enumerate(ells):
+        kevals = (ell+0.5)/chis
+        if zs.size>1:
+            # hack suggested in https://stackoverflow.com/questions/47087109/evaluate-the-output-from-scipy-2d-interpolation-along-a-curve
+            # to get around scipy.interpolate limitations
+            interpolated = si.dfitpack.bispeu(f.tck[0], f.tck[1], f.tck[2], f.tck[3], f.tck[4], kevals, zevals)[0]
+        else:
+            interpolated = f(kevals)
+        if zevals.size==1: Cells[i] = interpolated * prefactor
+        else: Cells[i] = np.trapz(interpolated*prefactor,zevals)
+    return Cells
