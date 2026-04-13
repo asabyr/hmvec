@@ -248,6 +248,45 @@ class HaloModel(Cosmology):
         cgs = rvirs/rgs
         ks,ukouts = generic_profile_fft(rhofunc,cgs,rgs[...,None],self.zs,self.ks,xmax,nxs)
         self.uk_profiles[name] = ukouts.copy()
+    
+    ################# Alina additions  #################
+    def add_custom_GNFW_rhoe_profile(self, name, GNFW_params,
+                            nxs=None,xmax=None,ignore_existing=False):
+
+        if not(ignore_existing): assert name not in self.uk_profiles.keys(), "Profile name already exists."
+        assert name!='nfw', "Name nfw is reserved."
+        if nxs is None: nxs = self.p['electron_density_profile_integral_numxs']
+        if xmax is None: xmax = self.p['electron_density_profile_integral_xmax']
+
+        # Convert masses to m200critz
+        rhocritz = self.rho_critical_z(self.zs)
+        if self.mdef=='vir':
+            delta_rhos1 = rhocritz*self.deltav(self.zs)
+        elif self.mdef=='mean':
+            delta_rhos1 = self.rho_matter_z(self.zs)*200.
+        rvirs = self.rvir(self.ms[None,:],self.zs[:,None])
+        cs = self.concentration()
+        delta_rhos2 = 200.*self.rho_critical_z(self.zs)
+        m200critz = mdelta_from_mdelta(self.ms,cs,delta_rhos1,delta_rhos2)
+        r200critz = R_from_M(m200critz,self.rho_critical_z(self.zs)[:,None],delta=200.)
+
+        # Generate profiles
+        """
+        The physical profile is rho(r) = f(2r/R200)
+        We rescale this to f(x), so x = r/(R200/2) = r/rgs
+        So rgs = R200/2 is the equivalent of rss in the NFW profile
+        """
+        omb = self.p['ombh2'] / self.h**2.
+        omm = self.omm0
+        rhofunc = lambda x: rho_gas_generic_x_custom_GNFW(x,m200critz[...,None],self.zs[:,None,None],omb,omm,rhocritz[...,None,None],
+                                    GNFW_params)
+
+        rgs = r200critz/GNFW_params['xc']
+        cgs = rvirs/rgs
+
+        ks,ukouts = generic_profile_fft(rhofunc,cgs,rgs[...,None],self.zs,self.ks,xmax,nxs)
+        self.uk_profiles[name] = ukouts.copy()
+    #################################################################
 
     def add_battaglia_pres_profile(self,name,family=None,param_override=None,
                               nxs=None,
@@ -859,7 +898,12 @@ def rho_gas_generic_x(x,m200critz,z,omb,omm,rhocritz,
     # Note the sign difference in the second gamma. Battaglia 2016 had a typo here.
     return (omb/omm) * rhocritz * rho0 * (x**gamma) * (1.+x**alpha)**(-(beta+gamma)/alpha)
 
+################ Alina additions ################
+def rho_gas_generic_x_custom_GNFW(x,m200critz,z,omb,omm,rhocritz,GNFW_params):
+    rhofunc = GNFW_params['rho0'] * (x**GNFW_params['gamma']) * (1.+x**GNFW_params['alpha'])**(-(GNFW_params['beta']+GNFW_params['gamma'])/GNFW_params['alpha'])
 
+    return (omb/omm) * rhocritz * rhofunc
+#################################################
    
 def P_e(r,m200critz,z,omb,omm,rhocritz,
             alpha=default_params['battaglia_pres_alpha'],
