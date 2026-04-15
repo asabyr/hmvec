@@ -50,7 +50,7 @@ def get_eds_model(fb=0.15,H0=68.0,YHe=0.25):
 
 class Cosmology(object):
 
-    def __init__(self,params={},halofit=None,engine='camb',accuracy='medium'):
+    def __init__(self,params={},halofit=None,engine='camb',accuracy='medium', camb_read_ini=''):
         engine = engine.lower()
         if not(engine in ['camb','class']): raise ValueError
         self.accuracy = accuracy
@@ -60,7 +60,7 @@ class Cosmology(object):
         self.p = dict(params) if params is not None else {}
         for param in default_params.keys():
             if param not in self.p.keys(): self.p[param] = default_params[param]
-        
+        self.camb_read_ini=camb_read_ini 
         # Cosmology
         self._init_cosmology(self.p,halofit)
 
@@ -161,7 +161,11 @@ class Cosmology(object):
         if self.engine=='camb':
             if ('sigma8' in params.keys()) or ('S8' in params.keys()):
                 print("sigma8 or S8 not supported with CAMB. Use the CLASS engine.")
-            self._camb_pars = camb.set_params(ns=params['ns'],As=params['As'],
+            if len(self.camb_read_ini)>0:
+                self._camb_pars=camb.read_ini(self.camb_read_ini)
+                print("reading ini")
+            else:
+                self._camb_pars = camb.set_params(ns=params['ns'],As=params['As'],
                                               r=rTensors,H0=H0,
                                         cosmomc_theta=theta,ombh2=params['ombh2'],
                                         omch2=params['omch2'], mnu=params['mnu'],
@@ -173,9 +177,9 @@ class Cosmology(object):
                                         dark_energy_model='ppf',
                                         halofit_version=self.p['default_halofit'] if halofit is None else halofit,
                                         AccuracyBoost=2,pivot_scalar=params['pivot_scalar'],YHe=YHe)
-            self._camb_pars.WantTransfer = True
-            if rTensors is not None:
-                self._camb_pars.WantTensors = True
+                self._camb_pars.WantTransfer = True
+                if rTensors is not None:
+                    self._camb_pars.WantTensors = True
             self._camb_results = camb.get_background(self._camb_pars)
         elif self.engine=='class':
             from classy import Class
