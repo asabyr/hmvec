@@ -62,6 +62,7 @@ default_params = {
     'electron_density_profile_integral_xmax':20,
     'electron_pressure_profile_integral_numxs':5000,
     'electron_pressure_profile_integral_xmax':20,
+    'battaglia_gas_xc':0.5,
     'battaglia_gas_gamma':-0.2,
     'battaglia_gas_family': 'AGN',
 

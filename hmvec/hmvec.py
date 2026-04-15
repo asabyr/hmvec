@@ -73,7 +73,7 @@ def duffy_concentration(m,z,A=None,alpha=None,beta=None,h=None):
     return A*((h*m/2.e12)**alpha)*(1+z)**beta
     
 class HaloModel(Cosmology):
-    def __init__(self,zs,ks,ms=None,params={},mass_function="sheth-torman",
+    def __init__(self,zs,ks,ms=None,params={},mass_function="tinker",
                  halofit=None,mdef='vir',nfw_numeric=False,skip_nfw=False,accuracy='medium',engine='camb'):
         self.zs = np.asarray(zs)
         self.ks = ks
@@ -248,7 +248,70 @@ class HaloModel(Cosmology):
         cgs = rvirs/rgs
         ks,ukouts = generic_profile_fft(rhofunc,cgs,rgs[...,None],self.zs,self.ks,xmax,nxs)
         self.uk_profiles[name] = ukouts.copy()
-    
+
+    def add_battaglia_profile_redefine_x(self,name,family=None,param_override=None,
+                              nxs=None,
+                              xmax=None,ignore_existing=False):
+        if not(ignore_existing): assert name not in self.uk_profiles.keys(), "Profile name already exists."
+        assert name!='nfw', "Name nfw is reserved."
+        if nxs is None: nxs = self.p['electron_density_profile_integral_numxs']
+        if xmax is None: xmax = self.p['electron_density_profile_integral_xmax']
+
+
+        # Set default parameters
+        if family is None: family = self.p['battaglia_gas_family'] # AGN or SH?
+        pparams = {}
+        pparams['battaglia_gas_gamma'] = self.p['battaglia_gas_gamma']
+        pparams['battaglia_gas_xc']=self.p['battaglia_gas_xc']
+        pparams.update(battaglia_defaults[family])
+
+        # Update with overrides
+        if param_override is not None:
+            print(param_override)
+            for key in param_override.keys():
+                if key=='battaglia_gas_gamma':
+                    pparams[key] = param_override[key]
+                elif  key=='battaglia_gas_xc':
+                    pparams[key] = param_override[key]
+                elif key in battaglia_defaults[family]:
+                    pparams[key] = param_override[key]
+                else:
+                    #raise ValueError # param in param_override doesn't seem to be a Battaglia parameter
+                    pass
+
+        # Convert masses to m200critz
+        rhocritz = self.rho_critical_z(self.zs)
+        if self.mdef=='vir':
+            delta_rhos1 = rhocritz*self.deltav(self.zs)
+        elif self.mdef=='mean':
+            delta_rhos1 = self.rho_matter_z(self.zs)*200.
+        rvirs = self.rvir(self.ms[None,:],self.zs[:,None])
+        cs = self.concentration()
+        delta_rhos2 = 200.*self.rho_critical_z(self.zs)
+        m200critz = mdelta_from_mdelta(self.ms,cs,delta_rhos1,delta_rhos2)
+        r200critz = R_from_M(m200critz,self.rho_critical_z(self.zs)[:,None],delta=200.)
+
+        # Generate profiles
+        omb = self.p['ombh2'] / self.h**2.
+        omm = self.omm0
+        rhofunc = lambda x: rho_gas_generic_x_redefine(x,m200critz[...,None],self.zs[:,None,None],omb,omm,rhocritz[...,None,None],
+                                    xc=pparams['battaglia_gas_xc'],
+                                    gamma=pparams['battaglia_gas_gamma'],
+                                    rho0_A0=pparams['rho0_A0'],
+                                    rho0_alpham=pparams['rho0_alpham'],
+                                    rho0_alphaz=pparams['rho0_alphaz'],
+                                    alpha_A0=pparams['alpha_A0'],
+                                    alpha_alpham=pparams['alpha_alpham'],
+                                    alpha_alphaz=pparams['alpha_alphaz'],
+                                    beta_A0=pparams['beta_A0'],
+                                    beta_alpham=pparams['beta_alpham'],
+                                    beta_alphaz=pparams['beta_alphaz'])
+
+        rgs = r200critz
+        cgs = rvirs/rgs
+        ks,ukouts = generic_profile_fft(rhofunc,cgs,rgs[...,None],self.zs,self.ks,xmax,nxs)
+        self.uk_profiles[name] = ukouts.copy()
+ 
     ################# Alina additions  #################
     def add_custom_GNFW_rhoe_profile(self, name, GNFW_params,
                             nxs=None,xmax=None,ignore_existing=False):
@@ -278,10 +341,10 @@ class HaloModel(Cosmology):
         """
         omb = self.p['ombh2'] / self.h**2.
         omm = self.omm0
-        rhofunc = lambda x: rho_gas_generic_x_custom_GNFW(x,m200critz[...,None],self.zs[:,None,None],omb,omm,rhocritz[...,None,None],
+        rhofunc = lambda x: rho_gas_generic_x_custom_GNFW(x,omb,omm,rhocritz[...,None,None],
                                     GNFW_params)
 
-        rgs = r200critz/GNFW_params['xc']
+        rgs = r200critz
         cgs = rvirs/rgs
 
         ks,ukouts = generic_profile_fft(rhofunc,cgs,rgs[...,None],self.zs,self.ks,xmax,nxs)
@@ -898,9 +961,33 @@ def rho_gas_generic_x(x,m200critz,z,omb,omm,rhocritz,
     # Note the sign difference in the second gamma. Battaglia 2016 had a typo here.
     return (omb/omm) * rhocritz * rho0 * (x**gamma) * (1.+x**alpha)**(-(beta+gamma)/alpha)
 
+def rho_gas_generic_x_redefine(x,m200critz,z,omb,omm,rhocritz,
+                    xc=default_params['battaglia_gas_xc'],
+                    gamma=default_params['battaglia_gas_gamma'],
+                    rho0_A0=battaglia_defaults[default_params['battaglia_gas_family']]['rho0_A0'],
+                    rho0_alpham=battaglia_defaults[default_params['battaglia_gas_family']]['rho0_alpham'],
+                    rho0_alphaz=battaglia_defaults[default_params['battaglia_gas_family']]['rho0_alphaz'],
+                    alpha_A0=battaglia_defaults[default_params['battaglia_gas_family']]['alpha_A0'],
+                    alpha_alpham=battaglia_defaults[default_params['battaglia_gas_family']]['alpha_alpham'],
+                    alpha_alphaz=battaglia_defaults[default_params['battaglia_gas_family']]['alpha_alphaz'],
+                    beta_A0=battaglia_defaults[default_params['battaglia_gas_family']]['beta_A0'],
+                    beta_alpham=battaglia_defaults[default_params['battaglia_gas_family']]['beta_alpham'],
+                    beta_alphaz=battaglia_defaults[default_params['battaglia_gas_family']]['beta_alphaz'],
+):
+    
+    scaled_x=x/xc
+    rho0 = battaglia_gas_fit(m200critz,z,rho0_A0,rho0_alpham,rho0_alphaz)
+    alpha = battaglia_gas_fit(m200critz,z,alpha_A0,alpha_alpham,alpha_alphaz)
+    beta = battaglia_gas_fit(m200critz,z,beta_A0,beta_alpham,beta_alphaz)
+    # Note the sign difference in the second gamma. Battaglia 2016 had a typo here.
+    return (omb/omm) * rhocritz * rho0 * (scaled_x**gamma) * (1.+scaled_x**alpha)**(-(beta+gamma)/alpha)
+
+
 ################ Alina additions ################
-def rho_gas_generic_x_custom_GNFW(x,m200critz,z,omb,omm,rhocritz,GNFW_params):
-    rhofunc = GNFW_params['rho0'] * (x**GNFW_params['gamma']) * (1.+x**GNFW_params['alpha'])**(-(GNFW_params['beta']+GNFW_params['gamma'])/GNFW_params['alpha'])
+def rho_gas_generic_x_custom_GNFW(x,omb,omm,rhocritz,GNFW_params):
+
+    scaled_x=x/GNFW_params['xc']
+    rhofunc = GNFW_params['rho0'] * (scaled_x**GNFW_params['gamma']) * (1.+scaled_x**GNFW_params['alpha'])**(-(GNFW_params['beta']+GNFW_params['gamma'])/GNFW_params['alpha'])
 
     return (omb/omm) * rhocritz * rhofunc
 #################################################
