@@ -621,6 +621,7 @@ class Cosmology(object):
         W_ksz=sigmaT*(1+zs)**2.0*ne_0 #W(chi)
 
         return limber_integral_in_chi(ells,zs,ks,Pee,zs,W_ksz,W_ksz,chis)
+    
     def C_DM_in_chi(self, ells, zs, ks, Pee, ne_0,sigmaT,dndz=None, zmin=None, zmax=None):
 
         chis = self.comoving_radial_distance(zs)
@@ -628,6 +629,20 @@ class Cosmology(object):
 
         return limber_integral_in_chi(ells,zs,ks,Pee,zs,W_DM,W_DM,chis)
     
+    def C_custom_Wchi(self, ells, zs, ks, Pee, Wchi1, Wchi2):
+        
+        chis = self.comoving_radial_distance(zs)
+        hzs = self.h_of_z(zs) # 1/Mpc
+        
+        return limber_integral(ells,zs,ks,Pee,zs,Wchi1/hzs,Wchi2/hzs,hzs,chis)
+    
+    def C_custom_Wchi_in_chi(self, ells, zs, ks, Pee, Wchi1, Wchi2):
+
+        chis = self.comoving_radial_distance(zs)
+        hzs = self.h_of_z(zs) # 1/Mpc
+        
+        return limber_integral_in_chi(ells,zs,ks,Pee,zs,Wchi1,Wchi2,chis)
+
     def total_matter_power_spectrum(self, Pnn, Pne, Pee):
         """
         Calculates the total matter auto-power spectrum.
