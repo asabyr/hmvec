@@ -187,7 +187,7 @@ class HaloModel(Cosmology):
     
     def add_battaglia_profile(self,name,family=None,param_override=None,
                               nxs=None,
-                              xmax=None,ignore_existing=False):
+                              xmax=None,ignore_existing=False, fft_int=True):
         if not(ignore_existing): assert name not in self.uk_profiles.keys(), "Profile name already exists."
         assert name!='nfw', "Name nfw is reserved."
         if nxs is None: nxs = self.p['electron_density_profile_integral_numxs']
@@ -246,12 +246,13 @@ class HaloModel(Cosmology):
 
         rgs = r200critz/2.
         cgs = rvirs/rgs
-        ks,ukouts = generic_profile_fft(rhofunc,cgs,rgs[...,None],self.zs,self.ks,xmax,nxs)
+        ks,ukouts = generic_profile_fft(rhofunc,cgs,rgs[...,None],self.zs,self.ks,xmax,nxs, fft_int=fft_int)
         self.uk_profiles[name] = ukouts.copy()
-
+        #np.savetxt(f"/global/cfs/cdirs/m3058/asabyr/FRB_kSZ/data/uk_B16_20x_numeric_int_{str(fft_int)}.txt",np.column_stack([self.ks,ukouts[0,100,:]]))
+    
     def add_battaglia_profile_redefine_x(self,name,family=None,param_override=None,
                               nxs=None,
-                              xmax=None,ignore_existing=False):
+                              xmax=None,ignore_existing=False, fft_int=True):
         if not(ignore_existing): assert name not in self.uk_profiles.keys(), "Profile name already exists."
         assert name!='nfw', "Name nfw is reserved."
         if nxs is None: nxs = self.p['electron_density_profile_integral_numxs']
@@ -309,12 +310,11 @@ class HaloModel(Cosmology):
 
         rgs = r200critz
         cgs = rvirs/rgs
-        ks,ukouts = generic_profile_fft(rhofunc,cgs,rgs[...,None],self.zs,self.ks,xmax,nxs)
+        ks,ukouts = generic_profile_fft(rhofunc,cgs,rgs[...,None],self.zs,self.ks,xmax,nxs, fft_int=fft_int)
         self.uk_profiles[name] = ukouts.copy()
  
-    ################# Alina additions  #################
     def add_custom_GNFW_rhoe_profile(self, name, GNFW_params,
-                            nxs=None,xmax=None,ignore_existing=False):
+                            nxs=None,xmax=None,ignore_existing=False, fft_int=True):
 
         if not(ignore_existing): assert name not in self.uk_profiles.keys(), "Profile name already exists."
         assert name!='nfw', "Name nfw is reserved."
@@ -347,13 +347,12 @@ class HaloModel(Cosmology):
         rgs = r200critz
         cgs = rvirs/rgs
 
-        ks,ukouts = generic_profile_fft(rhofunc,cgs,rgs[...,None],self.zs,self.ks,xmax,nxs)
+        ks,ukouts = generic_profile_fft(rhofunc,cgs,rgs[...,None],self.zs,self.ks,xmax,nxs, fft_int=fft_int)
         self.uk_profiles[name] = ukouts.copy()
-    #################################################################
 
     def add_battaglia_pres_profile(self,name,family=None,param_override=None,
                               nxs=None,
-                              xmax=None,ignore_existing=False):
+                              xmax=None,ignore_existing=False, fft_int=True):
         if not(ignore_existing): assert name not in self.pk_profiles.keys(), "Profile name already exists."
         assert name!='nfw', "Name nfw is reserved."
         if nxs is None: nxs = self.p['electron_pressure_profile_integral_numxs']
@@ -414,12 +413,12 @@ class HaloModel(Cosmology):
         cgs = rvirs/rgs
         sigmaT=constants.physical_constants['Thomson cross section'][0] # units m^2
         mElect=constants.physical_constants['electron mass'][0] / default_params['mSun']# units kg
-        ks,pkouts = generic_profile_fft(presFunc,cgs,rgs[...,None],self.zs,self.ks,xmax,nxs,do_mass_norm=False)
+        ks,pkouts = generic_profile_fft(presFunc,cgs,rgs[...,None],self.zs,self.ks,xmax,nxs,do_mass_norm=False, fft_int=fft_int)
         self.pk_profiles[name] = pkouts.copy()*4*np.pi*(sigmaT/(mElect*constants.c**2))*(r200critz**3*((1+self.zs)**2/self.h_of_z(self.zs))[...,None])[...,None]            
 
     def add_nfw_profile(self,name,numeric=False,
                         nxs=None,
-                        xmax=None,ignore_existing=False):
+                        xmax=None,ignore_existing=False, fft_int=True):
 
         """
         xmax should be thought of in "concentration units", i.e.,
@@ -442,9 +441,10 @@ class HaloModel(Cosmology):
         ms = self.ms
         rvirs = self.rvir(ms[None,:],self.zs[:,None])
         rss = (rvirs/cs)[...,None]
-        if numeric:
-            ks,ukouts = generic_profile_fft(lambda x: rho_nfw_x(x,rhoscale=1),cs,rss,self.zs,self.ks,xmax,nxs)
+        if numeric: 
+            ks,ukouts = generic_profile_fft(lambda x: rho_nfw_x(x,rhoscale=1),cs,rss,self.zs,self.ks,xmax,nxs, fft_int=fft_int)
             self.uk_profiles[name] = ukouts.copy()
+
         else:
             cs = cs[...,None]
             mc = np.log(1+cs)-cs/(1.+cs)
@@ -454,6 +454,8 @@ class HaloModel(Cosmology):
             ukouts = (np.sin(x)*(Sic-Si) - np.sin(cs*x)/((1+cs)*x) + np.cos(x)*(Cic-Ci))/mc
             self.uk_profiles[name] = ukouts.copy()
         
+        #save for one mass and redshift
+        #np.savetxt(f"/global/cfs/cdirs/m3058/asabyr/FRB_kSZ/data/uk_nfw_numi{numeric}_int{str(fft_int)}.txt",np.column_stack([self.ks,ukouts[0,100,:]])) 
         return self.ks,ukouts
 
     def add_hod(self,name,mthresh=None,ngal=None,corr="max",

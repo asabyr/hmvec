@@ -1,6 +1,6 @@
 import numpy as np
 #from numba import jit
-
+import sys
 """
 FFT routines
 """
@@ -53,7 +53,7 @@ def fft_integral(x,y,axis=-1):
 def analytic_fft_integral(ks): return np.sqrt(np.pi/2.)*np.exp(-ks**2./2.)*ks
 
 
-def generic_profile_fft(rhofunc_x,cmaxs,rss,zs,ks,xmax,nxs,do_mass_norm=True):
+def generic_profile_fft(rhofunc_x,cmaxs,rss,zs,ks,xmax,nxs,do_mass_norm=True, fft_int=False):
     """
     Generic profile FFTing
     rhofunc_x: function that accepts vector spanning linspace(0,xmax,nxs)
@@ -72,6 +72,7 @@ def generic_profile_fft(rhofunc_x,cmaxs,rss,zs,ks,xmax,nxs,do_mass_norm=True):
     """
     xs = np.linspace(0.,xmax,nxs+1)[1:]
     rhos = rhofunc_x(xs)
+
     if rhos.ndim==1:
         rhos = rhos[None,None]
     else:
@@ -87,10 +88,38 @@ def generic_profile_fft(rhofunc_x,cmaxs,rss,zs,ks,xmax,nxs,do_mass_norm=True):
         mnorm +=1
     # u(kt)
     integrand = rhos*theta
-    kts,ukts = fft_integral(xs,integrand)
-    uk = ukts/kts[None,None,:]/mnorm[...,None]
-    kouts = kts/rss/(1+zs[:,None,None]) # divide k by (1+z) here for comoving FIXME: check this!
-    ukouts = _interp_loop(ks.size,uk.shape[0],uk.shape[1],kouts,uk,ks)
+    
+    if fft_int==False: #original hmvec
+        kts,ukts = fft_integral(xs,integrand)
+        uk = ukts/kts[None,None,:]/mnorm[...,None]
+        kouts = kts/rss/(1+zs[:,None,None]) # divide k by (1+z) here for comoving FIXME: check this!
+        ukouts = _interp_loop(ks.size,uk.shape[0],uk.shape[1],kouts,uk,ks)
+    
+    elif fft_int==True: #do fft via integration
+        
+        rs=xs*rss #(Nz,NM,Nx) shape
+        
+        mass_integrand = theta * rhos * rs**2. #(Nz,NM,Nx) shape
+
+        mnorm = np.trapz(mass_integrand,rs) #(Nz,NM) shape 
+        
+        if not(do_mass_norm):
+            mnorm *= 0
+            mnorm +=1
+        
+        sin_term=np.sin(ks[None, None, :, None]*rs[:,:,None,:])/(ks[None, None, :, None]*rs[:,:,None,:]) #(Nz,NM,Nk,Nx) shape
+        
+        integrand_fft=theta[:,:,None,:] * rhos[:,:,None,:] * rs[:,:,None,:]**2.*sin_term #(Nz,NM,Nk,Nx) shape
+
+        uk_not_norm=np.trapz(integrand_fft, rs[:,:,None,:])  #(Nz,NM,Nk)
+
+        uk = uk_not_norm/mnorm[...,None] #divide uk of shape (Nz,NM,Nk) by mnorm (Nz,NM,1), uk[i,j]/mnorm[i,j] essentially
+        
+        ks_dim=np.broadcast_to(ks[None, None, :], (len(zs), len(uk_not_norm[1,:,1]),len(ks)))
+        kouts=ks_dim/(1+zs[:,None, None])
+
+        ukouts = _interp_loop(ks.size,uk.shape[0],uk.shape[1],kouts,uk,ks)
+
     return ks,ukouts
         
 #@jit(nopython=True)
