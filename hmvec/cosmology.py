@@ -528,12 +528,12 @@ class Cosmology(object):
             integral = integrand
             integral[ezs>zs] = 0
         else:
-            nznorm = np.trapz(dndz,zs)
+            nznorm = self.int_func(dndz,zs)
             dndz = dndz/nznorm
             # integrand has shape (num_z,num_zs) to be integrated over zs
             integrand = (chistar[None,:] - chis[:,None])/chistar[None,:] * dndz[None,:]
             for i in range(integrand.shape[0]): integrand[i][zs<ezs[i]] = 0 # FIXME: vectorize this
-            integral = np.trapz(integrand,zs,axis=-1)
+            integral = self.int_func(integrand,zs,axis=-1)
             
         return 1.5*self.omm0*H0**2.*(1.+ezs)*chis/H * integral
 
@@ -544,39 +544,39 @@ class Cosmology(object):
         chis = self.comoving_radial_distance(gzs)
         hzs = self.h_of_z(gzs) # 1/Mpc
         if gzs.size>1:
-            nznorm = np.trapz(gdndz,gzs)
+            nznorm = self.int_func(gdndz,gzs)
             Wz2s = gdndz/nznorm
         else:
             Wz2s = 1.
-        return limber_integral(ells,zs,ks,Pgm,gzs,Wz1s,Wz2s,hzs,chis)
+        return limber_integral(ells,zs,ks,Pgm,gzs,Wz1s,Wz2s,hzs,chis, self.int_func)
 
     def C_gg(self,ells,zs,ks,Pgg,gzs,gdndz=None,zmin=None,zmax=None):
         gzs = np.asarray(gzs)
         chis = self.comoving_radial_distance(gzs)
         hzs = self.h_of_z(gzs) # 1/Mpc
         if gzs.size>1:
-            nznorm = np.trapz(gdndz,gzs)
+            nznorm = self.int_func(gdndz,gzs)
             Wz1s = gdndz/nznorm
             Wz2s = gdndz/nznorm
         else:
             dchi = self.comoving_radial_distance(zmax) - self.comoving_radial_distance(zmin)
             Wz1s = 1.
             Wz2s = 1./dchi/hzs
-        return limber_integral(ells,zs,ks,Pgg,gzs,Wz1s,Wz2s,hzs,chis)
+        return limber_integral(ells,zs,ks,Pgg,gzs,Wz1s,Wz2s,hzs,chis, self.int_func)
 
     def C_kk(self,ells,zs,ks,Pmm,lzs1=None,ldndz1=None,lzs2=None,ldndz2=None,lwindow1=None,lwindow2=None):
         if lwindow1 is None: lwindow1 = self.lensing_window(zs,lzs1,ldndz1)
         if lwindow2 is None: lwindow2 = self.lensing_window(zs,lzs2,ldndz2)
         chis = self.comoving_radial_distance(zs)
         hzs = self.h_of_z(zs) # 1/Mpc
-        return limber_integral(ells,zs,ks,Pmm,zs,lwindow1,lwindow2,hzs,chis)
+        return limber_integral(ells,zs,ks,Pmm,zs,lwindow1,lwindow2,hzs,chis, self.int_func)
 
     def C_gy(self,ells,zs,ks,Pgp,gzs,gdndz=None,zmin=None,zmax=None):
         gzs = np.asarray(gzs)
         chis = self.comoving_radial_distance(gzs)
         hzs = self.h_of_z(gzs) # 1/Mpc
         if gzs.size>1:
-            nznorm = np.trapz(gdndz,gzs)
+            nznorm = self.int_func(gdndz,gzs)
             Wz1s = dndz/nznorm
             Wz2s = gdndz/nznorm
         else:
@@ -584,13 +584,13 @@ class Cosmology(object):
             Wz1s = 1.
             Wz2s = 1./dchi/hzs
 
-        return limber_integral(ells,zs,ks,Ppy,gzs,1,Wz2s,hzs,chis)
+        return limber_integral(ells,zs,ks,Ppy,gzs,1,Wz2s,hzs,chis, self.int_func)
 
     def C_ky(self,ells,zs,ks,Pym,lzs1=None,ldndz1=None,lzs2=None,ldndz2=None,lwindow1=None):
         if lwindow1 is None: lwindow1 = self.lensing_window(zs,lzs1,ldndz1)
         chis = self.comoving_radial_distance(zs)
         hzs = self.h_of_z(zs) # 1/Mpc
-        return limber_integral(ells,zs,ks,Pym,zs,lwindow1,1,hzs,chis)
+        return limber_integral(ells,zs,ks,Pym,zs,lwindow1,1,hzs,chis, self.int_func)
 
     def C_yy(self,ells,zs,ks,Ppp,dndz=None,zmin=None,zmax=None):
         chis = self.comoving_radial_distance(zs)
@@ -598,7 +598,7 @@ class Cosmology(object):
         # Convert to y units
         # 
 
-        return limber_integral(ells,zs,ks,Ppp,zs,1,1,hzs,chis)
+        return limber_integral(ells,zs,ks,Ppp,zs,1,1,hzs,chis, self.int_func)
     
     def C_kSZ(self, ells, zs, ks, Pee, ne_0,sigmaT,dndz=None, zmin=None, zmax=None):
         
@@ -606,7 +606,7 @@ class Cosmology(object):
         hzs = self.h_of_z(zs) # 1/Mpc
         W_ksz=sigmaT*(1+zs)**2.0*ne_0/hzs #W(z)=W(chi)c/H(z) 
         
-        return limber_integral(ells,zs,ks,Pee,zs,W_ksz,W_ksz,hzs,chis)
+        return limber_integral(ells,zs,ks,Pee,zs,W_ksz,W_ksz,hzs,chis, self.int_func)
 
     def C_DM(self, ells, zs, ks, Pee, ne_0,sigmaT,dndz=None, zmin=None, zmax=None):
 
@@ -614,34 +614,34 @@ class Cosmology(object):
         hzs = self.h_of_z(zs) # 1/Mpc
         W_DM=sigmaT*(1+zs)*ne_0/hzs #W(z)=W(chi)c/H(z)     
         
-        return limber_integral(ells,zs,ks,Pee,zs,W_DM,W_DM,hzs,chis)
+        return limber_integral(ells,zs,ks,Pee,zs,W_DM,W_DM,hzs,chis, self.int_func)
     
     def C_kSZ_in_chi(self, ells, zs, ks, Pee, ne_0,sigmaT,dndz=None, zmin=None, zmax=None):
         chis = self.comoving_radial_distance(zs)
         W_ksz=sigmaT*(1+zs)**2.0*ne_0 #W(chi)
 
-        return limber_integral_in_chi(ells,zs,ks,Pee,zs,W_ksz,W_ksz,chis)
+        return limber_integral_in_chi(ells,zs,ks,Pee,zs,W_ksz,W_ksz,chis, self.int_func)
     
     def C_DM_in_chi(self, ells, zs, ks, Pee, ne_0,sigmaT,dndz=None, zmin=None, zmax=None):
 
         chis = self.comoving_radial_distance(zs)
         W_DM=sigmaT*(1+zs)*ne_0 #W(chi)
 
-        return limber_integral_in_chi(ells,zs,ks,Pee,zs,W_DM,W_DM,chis)
+        return limber_integral_in_chi(ells,zs,ks,Pee,zs,W_DM,W_DM,chis, self.int_func)
     
     def C_custom_Wchi(self, ells, zs, ks, Pee, Wchi1, Wchi2):
         
         chis = self.comoving_radial_distance(zs)
         hzs = self.h_of_z(zs) # 1/Mpc
         
-        return limber_integral(ells,zs,ks,Pee,zs,Wchi1/hzs,Wchi2/hzs,hzs,chis)
-    
+        return limber_integral(ells,zs,ks,Pee,zs,Wchi1/hzs,Wchi2/hzs,hzs,chis, self.int_func)
+
     def C_custom_Wchi_in_chi(self, ells, zs, ks, Pee, Wchi1, Wchi2):
 
         chis = self.comoving_radial_distance(zs)
         hzs = self.h_of_z(zs) # 1/Mpc
         
-        return limber_integral_in_chi(ells,zs,ks,Pee,zs,Wchi1,Wchi2,chis)
+        return limber_integral_in_chi(ells,zs,ks,Pee,zs,Wchi1,Wchi2,chis, self.int_func)
 
     def total_matter_power_spectrum(self, Pnn, Pne, Pee):
         """
@@ -911,7 +911,7 @@ class Cosmology(object):
 
 def a2z(a): return (1.0/np.atleast_1d(a))-1.0
 
-def limber_integral(ells,zs,ks,Pzks,gzs,Wz1s,Wz2s,hzs,chis):
+def limber_integral(ells,zs,ks,Pzks,gzs,Wz1s,Wz2s,hzs,chis, int_func):
     r"""
     Get C(ell) = \int dz (H(z)/c) W1(z) W2(z) Pzks(z,k=ell/chi) / chis**2.
     ells: (nells,) multipoles looped over
@@ -947,10 +947,10 @@ def limber_integral(ells,zs,ks,Pzks,gzs,Wz1s,Wz2s,hzs,chis):
         else:
             interpolated = f(kevals)
         if zevals.size==1: Cells[i] = interpolated * prefactor
-        else: Cells[i] = np.trapz(interpolated*prefactor,zevals)
+        else: Cells[i] = int_func(interpolated*prefactor,zevals)
     return Cells
 
-def limber_integral_in_chi(ells,zs,ks,Pzks,gzs,Wchi1s,Wchi2s,chis):
+def limber_integral_in_chi(ells,zs,ks,Pzks,gzs,Wchi1s,Wchi2s,chis, int_func):
     r"""
     Get C(ell) = \int dchi W1(chi) W2(chi) Pzks(z,k=ell/chi) / chis**2.
     ells: (nells,) multipoles looped over
@@ -985,5 +985,5 @@ def limber_integral_in_chi(ells,zs,ks,Pzks,gzs,Wchi1s,Wchi2s,chis):
         else:
             interpolated = f(kevals)
         if zevals.size==1: Cells[i] = interpolated * prefactor
-        else: Cells[i] = np.trapz(interpolated*prefactor,zevals)
+        else: Cells[i] = int_func(interpolated*prefactor,zevals)
     return Cells

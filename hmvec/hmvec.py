@@ -74,9 +74,10 @@ def duffy_concentration(m,z,A=None,alpha=None,beta=None,h=None):
     
 class HaloModel(Cosmology):
     def __init__(self,zs,ks,ms=None,params={},mass_function="tinker",
-                 halofit=None,mdef='vir',nfw_numeric=False,skip_nfw=False,accuracy='medium',engine='camb'):
+                 halofit=None,mdef='vir',nfw_numeric=False,skip_nfw=False,accuracy='medium',engine='camb', int_func=scipy.integrate.simpson):
         self.zs = np.asarray(zs)
         self.ks = ks
+        self.int_func=int_func
         Cosmology.__init__(self,params,halofit,accuracy=accuracy,engine=engine)
         
         self.mdef = mdef
@@ -567,7 +568,7 @@ class HaloModel(Cosmology):
 
     def get_bg(self,Nc,Ns,ngal):
         integrand = self.nzm * (Nc+Ns) * self.bh
-        return np.trapz(integrand,self.ms,axis=-1)/ngal
+        return self.int_func(integrand,self.ms,axis=-1)/ngal
     
 
     def _get_hod_common(self,name):
@@ -627,14 +628,14 @@ class HaloModel(Cosmology):
                 else: raise ValueError
         
         integrand = self.nzm[...,None] * square_term
-        return np.trapz(integrand,ms,axis=-2)*(1-np.exp(-(self.ks/self.p['kstar_damping'])**2.))
+        return self.int_func(integrand,np.squeeze(ms),axis=-2)*(1-np.exp(-(self.ks/self.p['kstar_damping'])**2.))
     
     def get_power_2halo(self,name="nfw",name2=None,verbose=False,b1_in=None,b2_in=None):
         name2 = name if name2 is None else name2
         
         def _2haloint(iterm):
             integrand = self.nzm[...,None] * iterm * self.bh[...,None]
-            integral = np.trapz(integrand,ms,axis=-2)
+            integral = self.int_func(integrand,np.squeeze(ms),axis=-2)
             return integral
 
         def _get_term(iname):
@@ -722,7 +723,7 @@ class HaloModel(Cosmology):
         ints = []
         for theta in thetas: # vectorize
             integrand = rhomz * bhs * Ps / (1+zlens)**3. / sigmac / DAz**2 * j0(ells*theta) * ells / 2./ np.pi
-            ints.append( np.trapz(integrand,ells) )
+            ints.append(self.int_func(integrand,ells) )
         return np.asarray(ints)
 
 """
@@ -1087,4 +1088,4 @@ def ngal_from_mthresh(log10mthresh=None,zs=None,nzm=None,ms=None,
         assert zs is None
         assert sig_log_mstellar is None
     integrand = nzm * (Ncs+Nss)
-    return np.trapz(integrand,ms,axis=-1)   
+    return self.int_func(integrand,ms,axis=-1)   
