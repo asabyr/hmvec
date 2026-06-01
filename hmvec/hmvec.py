@@ -517,7 +517,7 @@ class HaloModel(Cosmology):
             assert mthresh is None
 
 
-            nfunc = lambda ilog10mthresh: ngal_from_mthresh(ilog10mthresh,
+            nfunc = lambda ilog10mthresh: ngal_from_mthresh(self.int_func, ilog10mthresh,
                                                             self.zs,
                                                             self.nzm,
                                                             self.ms,
@@ -564,7 +564,7 @@ class HaloModel(Cosmology):
         self.hods[name]['central_profile'] = central_profile_name
         self.hods[name]['log10mthresh'] = np.log10(mthresh[:,None])
         
-    def get_ngal(self,Nc,Ns): return ngal_from_mthresh(nzm=self.nzm,ms=self.ms,Ncs=Nc,Nss=Ns)
+    def get_ngal(self,Nc,Ns): return ngal_from_mthresh(int_func=self.int_func, nzm=self.nzm,ms=self.ms,Ncs=Nc,Nss=Ns)
 
     def get_bg(self,Nc,Ns,ngal):
         integrand = self.nzm * (Nc+Ns) * self.bh
@@ -1067,7 +1067,7 @@ def P_e_generic_x(x,m200critz,R200critz,z,omb,omm,rhocritz,
 def a2z(a): return (1.0/a)-1.0
 
 
-def ngal_from_mthresh(log10mthresh=None,zs=None,nzm=None,ms=None,
+def ngal_from_mthresh(int_func=scipy.integrate.simpson, log10mthresh=None,zs=None,nzm=None,ms=None,
                       sig_log_mstellar=None,Ncs=None,Nss=None,
                       alphasat=None,Bsat=None,betasat=None,
                       Bcut=None,betacut=None,
@@ -1088,4 +1088,4 @@ def ngal_from_mthresh(log10mthresh=None,zs=None,nzm=None,ms=None,
         assert zs is None
         assert sig_log_mstellar is None
     integrand = nzm * (Ncs+Nss)
-    return self.int_func(integrand,ms,axis=-1)   
+    return int_func(integrand,ms,axis=-1)   
