@@ -563,6 +563,23 @@ class Cosmology(object):
             Wz1s = 1.
             Wz2s = 1./dchi/hzs
         return limber_integral(ells,zs,ks,Pgg,gzs,Wz1s,Wz2s,hzs,chis, self.int_func)
+    
+    def C_gg_extra_W(self,ells,zs,ks,Pgg,gzs, gdndz=None, Wz_extra=None):
+        
+        gzs = np.asarray(gzs)
+        chis = self.comoving_radial_distance(gzs)
+        hzs = self.h_of_z(gzs) # 1/Mpc
+        
+        if gzs.size>1:
+            nznorm = self.int_func(gdndz,gzs)
+            Wz1s = gdndz/nznorm
+            Wz2s = gdndz/nznorm
+        else:
+            dchi = self.comoving_radial_distance(zmax) - self.comoving_radial_distance(zmin)
+            Wz1s = 1.
+            Wz2s = 1./dchi/hzs
+        
+        return limber_integral(ells,zs,ks,Pgg,gzs,Wz1s*Wz_extra,Wz2s*Wz_extra,hzs,chis, self.int_func)
 
     def C_kk(self,ells,zs,ks,Pmm,lzs1=None,ldndz1=None,lzs2=None,ldndz2=None,lwindow1=None,lwindow2=None):
         if lwindow1 is None: lwindow1 = self.lensing_window(zs,lzs1,ldndz1)
@@ -611,11 +628,39 @@ class Cosmology(object):
     def C_DM(self, ells, zs, ks, Pee, ne_0,sigmaT,dndz=None, zmin=None, zmax=None):
 
         chis = self.comoving_radial_distance(zs)
-        hzs = self.h_of_z(zs) # 1/Mpc
+        hzs = self.h_of_z(zs) # 1/Mpc H(z)/c
         W_DM=sigmaT*(1+zs)*ne_0/hzs #W(z)=W(chi)c/H(z)     
         
         return limber_integral(ells,zs,ks,Pee,zs,W_DM,W_DM,hzs,chis, self.int_func)
     
+    def C_kSZ_g(self, ells, zs, ks, Peg, ne_0, sigmaT, dndz, zmin=None, zmax=None):
+        
+        chis = self.comoving_radial_distance(zs)
+        hzs = self.h_of_z(zs) # 1/Mpc
+        
+        #ksz
+        Wz1s=sigmaT*(1+zs)**2.0*ne_0/hzs
+
+        #galaxies
+        nznorm = self.int_func(dndz,zs)
+        Wz2s = dndz/nznorm
+
+        return limber_integral(ells,zs,ks,Peg,zs,Wz1s,Wz2s,hzs,chis,self.int_func)
+
+    def C_DM_g(self, ells, zs, ks, Peg, ne_0, sigmaT, dndz, zmin=None, zmax=None):
+
+        chis = self.comoving_radial_distance(zs)
+        hzs = self.h_of_z(zs) # 1/Mpc
+
+        #DM
+        Wz1s=sigmaT*(1+zs)*ne_0/hzs
+
+        #galaxies
+        nznorm = self.int_func(dndz,zs)
+        Wz2s = dndz/nznorm
+
+        return limber_integral(ells,zs,ks,Peg,zs,Wz1s,Wz2s,hzs,chis,self.int_func)
+        
     def C_kSZ_in_chi(self, ells, zs, ks, Pee, ne_0,sigmaT,dndz=None, zmin=None, zmax=None):
         chis = self.comoving_radial_distance(zs)
         W_ksz=sigmaT*(1+zs)**2.0*ne_0 #W(chi)
@@ -632,7 +677,7 @@ class Cosmology(object):
     def C_custom_Wchi(self, ells, zs, ks, Pee, Wchi1, Wchi2):
         
         chis = self.comoving_radial_distance(zs)
-        hzs = self.h_of_z(zs) # 1/Mpc
+        hzs = self.h_of_z(zs) # 1/Mpc H(z)/c
         
         return limber_integral(ells,zs,ks,Pee,zs,Wchi1/hzs,Wchi2/hzs,hzs,chis, self.int_func)
 
