@@ -64,14 +64,14 @@ class Cosmology(object):
         # Cosmology
         self._init_cosmology(self.p,halofit)
 
-    def get_cmb_cls(self,lmax=3000,lens_potential_accuracy=4,nonlinear=True):
+    def get_cmb_cls(self,lmax=3000,max_eta_k=None, lens_potential_accuracy=4,nonlinear=True):
         if self.engine=='camb':
             if nonlinear:
                 self._camb_pars.NonLinear = model.NonLinear_both
             else:
                 self._camb_pars.NonLinear = model.NonLinear_none
             if not(nonlinear): lens_potential_accuracy = 0
-            self._camb_pars.set_for_lmax(lmax=(lmax+500), lens_potential_accuracy=lens_potential_accuracy)
+            self._camb_pars.set_for_lmax(lmax=(lmax+500),max_eta_k=max_eta_k, lens_potential_accuracy=lens_potential_accuracy)
             self._camb_results.calc_power_spectra(self._camb_pars)
             powers = self._camb_results.get_cmb_power_spectra(self._camb_pars, CMB_unit='muK',raw_cl=True)
         elif self.engine=='class':
