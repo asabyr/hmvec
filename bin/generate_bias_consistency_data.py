@@ -1,3 +1,5 @@
+import sys
+sys.path.append("/global/cfs/cdirs/m3058/asabyr/hmvec/hmvec/")
 import matplotlib.pyplot as plt
 import numpy as np
 import tinker
@@ -7,7 +9,7 @@ zmax = 3.
 lognumin = -8
 lognumax = 2
 numnus = 10000
-filename = "alpha_consistency.txt"
+filename = "../data/alpha_consistency.txt"
 
 delta = 200.
 
